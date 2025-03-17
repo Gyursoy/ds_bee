@@ -1,0 +1,55 @@
+data:
+  wav_dir: "Data\\WAV_data"
+  pcm_dir : "Data\\PCM_data"
+  data_folder: "Data"
+  df_path: "Data\\df_sorted.csv"
+  df_model_path: "Data\\df_model.csv"
+  dir_dict:
+    mel: "melSpectrogram_data"
+    stf: "stft_data"
+    chr: "chromogram_data"
+    mfc: "mfcc_data"
+    dmf: "mfccDelta_data"
+
+  files_to_unarchive : ["Data/2020.07.26.zip", "Data/2020.06.20.zip"]
+  hives_to_include : [22, 30, 31, 34, 35, 36, 37]
+
+audio:
+  duration: 8.203125
+  sample_rate: 8000
+  n_fft: 2048
+  hop_length: 512  # n_fft / 4
+  n_mels : 48
+  window_length: 128  # duration * sample_rate / hop_length
+
+seed: 42
+device : "cuda"
+
+model:
+  prediction_type: 'regression'
+  train_batch_size: 32
+  val_batch_size: 16
+  test_batch_size: 8
+  learning_rate: 1e-3
+  weight_decay: 2e-4
+  patience: 7
+  num_epochs: 50
+
+genetic_algorithm:
+  population_size: 30
+  num_generations: 10
+  mutation_rate: 0.1
+  target_feature_count: 50
+  new_individual_prob: 0.07
+  feature_weights:
+    mfc: 1.0
+    dmf: 1.0
+    mel: 0.8
+    stf: 0.2
+    chr: 1.0
+  feature_counts:
+    mfc: 12
+    dmf: 12
+    mel: 48
+    stf: 1024
+    chr: 12
