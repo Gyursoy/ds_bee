@@ -16,6 +16,7 @@ from src.preprocessing import AudioFeatureExtractor
 
 import os
 
+# Unarchive and convert PCM files to WAV
 def convert_to_WAV():
 
     preproc.audio_conversion.unarchive(config['data']['files_to_unarchive'], config['data']['pcm_dir'])
@@ -23,9 +24,8 @@ def convert_to_WAV():
                                               filter_hives=True, included_hives=config['data']['hives_to_include'])
     return None
 
-
-def main():
-
+# Extract features from WAV files
+def extract_features():
     df = pd.read_csv(Path(config['data']['df_path']))
 
     df_model = construct_regression_df(df)
@@ -45,10 +45,43 @@ def main():
         dir_dict=config['data']['dir_dict']
     )
 
-    # if defect_files:
-    #     print(f"Found {len(defect_files)} defective files")
-        
-    return
+    if defect_files:
+        print(f"Found {len(defect_files)} defective files")
+
+# Check if dataset working properly
+def check_dataset():
+
+    return None
+
+# Run experiments
+def run_genetic_algorithm():
+
+    return None
+
+def test_new_features():
+
+    test_file = config['data']['wav_dir']+'\\'+'__200616-054646-22.wav'
+    output_path = config['data']['data_folder']+'\\'+'test'+'\\'+'test.jpg'
+
+    extractor = AudioFeatureExtractor(audio_params = config['audio'])
+    y, _ = lb.load(path=test_file, sr=config['audio']['sample_rate'])
+
+    feature = extractor.lpc_features(y, config['data']['data_folder']+'\\'+'test'+'\\'+'test.jpg')
+
+    print(feature.shape)
+
+    return None
+
+
+def main():
+
+    # convert_to_WAV()
+
+    # extract_features()
+
+    test_new_features()
+
+
 
 if __name__ ==  "__main__":
     main()

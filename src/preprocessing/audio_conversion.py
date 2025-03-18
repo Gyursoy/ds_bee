@@ -29,16 +29,16 @@ def pcm_to_wav(file_path: str, source_dir: str, target_dir: str, nchannels: int 
 def pcm_to_wav_batch(source_dir, target_dir, filter_hives=False, included_hives=None):
     par_dir = os.path.abspath(os.getcwd())
 
-    if not os.path.isdir(par_dir+source_dir):
-        print(f'Missing source directory: {par_dir+source_dir}')
+    if not os.path.isdir(par_dir+'//'+source_dir):
+        print(f'Missing source directory: {par_dir}//{source_dir}')
         sys.exit(1)
 
-    if not os.path.isdir(par_dir+target_dir):
-        os.mkdir(par_dir+target_dir)
+    if not os.path.isdir(par_dir+'//'+target_dir):
+        os.mkdir(par_dir+'//'+target_dir)
         print(f'Missing target directory. Creating: {target_dir}')
 
     idx = 0
-    audiofiles = glob.glob("*/*/*/*.pcm", root_dir=par_dir+source_dir)
+    audiofiles = glob.glob("*/*/*/*.pcm", root_dir=par_dir+'//'+source_dir)
 
     if filter_hives:
         filtered_audiofiles = []
@@ -51,7 +51,7 @@ def pcm_to_wav_batch(source_dir, target_dir, filter_hives=False, included_hives=
     for file in filtered_audiofiles:
         # print(par_dir+target_dir)
         # print(file.split('\\')[-1][:-4])
-        pcm_to_wav(file_path=file, source_dir=par_dir+source_dir, target_dir=par_dir+target_dir)
+        pcm_to_wav(file_path=file, source_dir=par_dir+'//'+source_dir, target_dir=par_dir+'//'+target_dir)
         # pcm_to_wav(file_path=file, source_dir=source_dir, target_dir=target_dir)
         idx += 1
 
