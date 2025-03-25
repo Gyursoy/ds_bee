@@ -17,14 +17,19 @@ TEST = 'Test'
 
 
 class AudioDataset(Dataset):
+
+    stat_features = ['zcr', 'rms', 'sce', 'lpc']
+    img_features = ['mel', 'mfc', 'stf', 'chr', 'dmf']
+
     def __init__(self, transform=None, selected_features=None):
         
-        df = pd.read_csv(Path(config['data']['df_path']))
+        df = pd.read_csv(Path(config['data']['df_model_path']))
 
-        if config['model']['prediction_type'] == 'regression':
-            self.df = self.construct_regression_df(df)
-        else:
-            self.df = df
+        # if config['model']['prediction_type'] == 'regression':
+        #     self.df = self.construct_regression_df(df)
+        # else:
+        #     self.df = df
+        self.df = df
             
         self.data_folder = Path(config['data']['data_folder'])
         self.dir_dict = config['data']['dir_dict']
@@ -45,17 +50,25 @@ class AudioDataset(Dataset):
 
         imgs = {}
         for feature, dir_name in self.dir_dict.items():
-            img_name = feature + self.df.iloc[idx]['audio'][:-4] + ".jpg"
-            imgs[feature] = read_image(str(self.data_folder / dir_name / img_name))
+            if feature in self.stat_features:
+                feat_name = dir_name + self.df.iloc[idx]['audio'][:-4] + ".npz"
+                imgs[feature] = np.load(self.data_folder / dir_name / feat_name)['arr_0']
+                imgs[feature] = torch.tensor(imgs[feature])
+            else:     
+                img_name = dir_name + self.df.iloc[idx]['audio'][:-4] + ".jpg"
+                imgs[feature] = read_image(str(self.data_folder / dir_name / img_name))
             
-            if self.transform:
-                imgs[feature] = self.transform(imgs[feature])
+                if self.transform:
+                    imgs[feature] = self.transform(imgs[feature])
 
             if self.selected_features is not None:
                 imgs[feature] = imgs[feature][:, self.selected_features[feature]]
 
         return imgs, label
     
+
+    
+
 
 
     

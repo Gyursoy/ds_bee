@@ -10,6 +10,7 @@ import src.models as models
 import src.feature_selection as fs
 import src.feature_selection.genetic as genetic
 from src.preprocessing.dataset import construct_regression_df
+import src
 
 # import src.preprocessing.feature_extraction as feature_extraction
 from src.preprocessing import AudioFeatureExtractor
@@ -55,6 +56,14 @@ def check_dataset():
 
 # Run experiments
 def run_genetic_algorithm():
+    df_model = pd.read_csv(config['data']['df_model_path'])
+    dfs = preproc.dataset.get_dataframes(df_model)
+
+    results = genetic.genetic_algorithm(dfs)
+    res_path = config['data']['data_folder'] + "\\ga_results"
+    if not os.path.exists(res_path):
+        os.makedirs(res_path)
+    results.to_csv(res_path + "\\results.csv")
 
     return None
 
@@ -66,11 +75,24 @@ def test_new_features():
     extractor = AudioFeatureExtractor(audio_params = config['audio'])
     y, _ = lb.load(path=test_file, sr=config['audio']['sample_rate'])
 
-    feature = extractor.lpc_features(y, config['data']['data_folder']+'\\'+'test'+'\\'+'test.jpg')
+    feature = extractor.power_spectral_density(y, config['data']['data_folder']+'\\'+'test'+'\\'+'test.jpg')
 
     print(feature.shape)
 
     return None
+
+def tmp():
+
+    tmp_feat = np.load('Data\spectralCentroid_data\spectralCentroid_data__200726-095704-22.npz')
+
+    print(tmp_feat['arr_0'])
+
+    # df = pd.read_csv(config['data']['df_model_path'])
+
+    # dataset = preproc.AudioDataset()
+
+    # print(dataset[1][0]['sce'])
+
 
 
 def main():
@@ -80,7 +102,9 @@ def main():
     # extract_features()
 
     test_new_features()
+    # tmp()
 
+    # genetic.genetic_algorithm()
 
 
 if __name__ ==  "__main__":

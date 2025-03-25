@@ -7,6 +7,7 @@ from tqdm import tqdm
 import gc
 from pathlib import Path
 from typing import Dict, List, Tuple
+from scipy.signal import welch
 
 __all__ = ['AudioFeatureExtractor']
 
@@ -124,33 +125,31 @@ class AudioFeatureExtractor:
 
         # Save numerical features in npz format
         npz_file = image_file.replace('.jpg', '.npz')
-        np.savez_compressed(npz_file, rms_features=zcr)
+        np.savez_compressed(npz_file, zcr)
 
         return zcr
 
     def spectral_centroid(self, y: np.ndarray, image_file: str) -> None:
+        # Calculate frame length to match window_length
+        frame_length = len(y) // self.window_length
+        
         # Calculate spectral centroid
-        centroid = lb.feature.spectral_centroid(y=y, sr=self.sr, 
-                                              hop_length=self.hop_length,
-                                              n_fft=self.n_fft)
+        centroid = lb.feature.spectral_centroid(
+            y=y, 
+            sr=self.sr,
+            n_fft=self.n_fft,
+            hop_length=frame_length
+        )
+        
         # Ensure we get exactly window_length frames
         centroid = lb.util.fix_length(centroid, size=self.window_length, axis=1)
         
-        # Normalize for better visualization
-        centroid = lb.util.normalize(centroid)
+        # Scale the centroid values to a reasonable range while preserving relationships
+        centroid = (centroid - np.min(centroid)) / (np.max(centroid) - np.min(centroid) + 1e-6)
         
-        # Save as image
-        # fig = plt.figure(figsize=(1.28, 0.12), dpi=100)
-        # lb.display.specshow(centroid, sr=self.sr, hop_length=self.hop_length)
-        # plt.axis('off')
-        # plt.tight_layout(pad=0)
-        # plt.savefig(image_file, pad_inches=0)
-        # plt.clf()
-        # plt.close(fig)
-
         # Save numerical features in npz format
         npz_file = image_file.replace('.jpg', '.npz')
-        np.savez_compressed(npz_file, rms_features=centroid)
+        np.savez_compressed(npz_file, centroid)
 
         return centroid
 
@@ -176,7 +175,7 @@ class AudioFeatureExtractor:
 
         # Save numerical features in npz format
         npz_file = image_file.replace('.jpg', '.npz')
-        np.savez_compressed(npz_file, rms_features=rms_db)
+        np.savez_compressed(npz_file, rms_db)
 
         return rms_db
     
@@ -204,9 +203,47 @@ class AudioFeatureExtractor:
         
         # Save numerical features in npz format
         npz_file = image_file.replace('.jpg', '.npz')
-        np.savez_compressed(npz_file, lpc_features=lpc_features)
+        np.savez_compressed(npz_file, lpc_features)
         
         return lpc_features
+    
+    def power_spectral_density(self, y: np.ndarray, image_file: str) -> None:
+        # Calculate frame length to match window_length
+        frame_length = len(y) // self.window_length
+        
+        
+        # Initialize array to store PSD values
+        psd_features = np.zeros((self.n_fft//2 + 1, self.window_length))
+        
+        # Process audio in frames
+        for i in range(self.window_length):
+            start = i * frame_length
+            end = start + frame_length
+            if end <= len(y):
+                frame = y[start:end]
+                # Calculate PSD using Welch method
+                frequencies, psd = welch(frame, fs=self.sr, nperseg=min(256, len(frame)), 
+                                      noverlap=None, nfft=self.n_fft)
+                psd_features[:, i] = psd
+        
+        # Convert to dB scale and normalize
+        psd_features = lb.amplitude_to_db(psd_features, ref=np.max)
+        psd_features = lb.util.normalize(psd_features)
+
+        # Save as image
+        fig = plt.figure(figsize=(1.28, 0.12), dpi=100)
+        lb.display.specshow(psd_features, sr=self.sr, hop_length=self.hop_length)
+        plt.axis('off')
+        plt.tight_layout(pad=0)
+        plt.savefig(image_file, pad_inches=0)
+        plt.clf()
+        plt.close(fig)
+
+        # Save numerical features in npz format
+        # npz_file = image_file.replace('.jpg', '.npz')
+        # np.savez_compressed(npz_file, psd_features)
+        
+        return psd_features
 
     def cnn_features(self, y: np.ndarray, image_file: str) -> None:
         # Implement a CNN model to extract features from the audio file
@@ -234,14 +271,11 @@ class AudioFeatureExtractor:
                     gc.collect()
                     defect_files.append(file)
                     continue
-
-                feature_types = {
-                    "mel": (self.create_spectrogram, "mel"),
-                    "chr": (self.create_chromogram, "chr"),
-                    "stf": (self.create_stft, "stf"),
-                    "mfc": (self.create_mfcc, "mfc"),
-                    "dmf": (self.create_mfcc_delta, "dmf")
-                }
+                
+                feature_types = {}
+                for key in dir_dict.keys():
+                    os.makedirs(os.path.abspath(os.path.join(output_path, dir_dict[key])), exist_ok=True)
+                    feature_types[key] = (self.map_dir_to_features(key), dir_dict[key])
 
                 for key, (func, prefix) in feature_types.items():
                     # output_file = output_path / dir_dict[key] / f"{prefix}{file.replace('.wav', '.jpg')}"
@@ -259,3 +293,19 @@ class AudioFeatureExtractor:
                 
             
         return defect_files
+    
+
+    def map_dir_to_features(self, key):
+        dir_to_func = { "mel": self.create_spectrogram,
+                        "stf": self.create_stft,
+                        "chr": self.create_chromogram,
+                        "mfc": self.create_mfcc,
+                        "dmf": self.create_mfcc_delta,
+                        "zcr" : self.zero_crossing_rate,
+                        "rms" : self.rms_energy,
+                        "lpc" : self.lpc_features,
+                        "sce" : self.spectral_centroid,
+                        "psd" : self.power_spectral_density
+                        }
+        
+        return dir_to_func[key]

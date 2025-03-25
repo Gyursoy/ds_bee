@@ -10,6 +10,10 @@ data:
     chr: "chromogram_data"
     mfc: "mfcc_data"
     dmf: "mfccDelta_data"
+    zcr : "zcr_data"
+    rms : "rms_data"
+    lpc : "lpc_data"
+    sce : "spectralCentroid_data"
 
   files_to_unarchive : ["Data/2020.07.26.zip", "Data/2020.06.20.zip"]
   hives_to_include : [22, 30, 31, 34, 35, 36, 37]
@@ -47,9 +51,17 @@ genetic_algorithm:
     mel: 0.8
     stf: 0.2
     chr: 1.0
+    zcr: 1.0
+    rms: 1.0
+    lpc: 1.0
+    sce: 1.0
   feature_counts:
     mfc: 12
     dmf: 12
     mel: 48
     stf: 1024
     chr: 12
+    zcr: 1
+    rms: 1
+    lpc: 16
+    sce: 1
