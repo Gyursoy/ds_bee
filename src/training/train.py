@@ -4,9 +4,9 @@ import torch
 from tqdm.auto import tqdm
 from ..utils.config import config
 
-TRAIN = 'Train'
-VAL = 'Val' 
-TEST = 'Test'
+TRAIN = 'train'
+VAL = 'val'
+TEST = 'test'
 
 def train_model(model, criterion, optimizer, dataloaders, num_epochs=None, display_disabled=False):
     since = time.time()

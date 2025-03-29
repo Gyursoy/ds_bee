@@ -46,7 +46,7 @@ class AudioDataset(Dataset):
         else:
             label = self.df.iloc[idx]['timedelta_hours']
 
-        label = torch.tensor(label)
+        label = torch.tensor(label).to(config['device'])
 
         imgs = {}
         for feature, dir_name in self.dir_dict.items():
@@ -55,6 +55,7 @@ class AudioDataset(Dataset):
                 imgs[feature] = np.load(self.data_folder / dir_name / feat_name)['arr_0']
                 imgs[feature] = torch.tensor(imgs[feature])
                 imgs[feature] = imgs[feature].unsqueeze(0)
+                imgs[feature] = imgs[feature].float()
             else:     
                 img_name = dir_name + self.df.iloc[idx]['audio'][:-4] + ".jpg"
                 imgs[feature] = read_image(str(self.data_folder / dir_name / img_name))
@@ -64,6 +65,8 @@ class AudioDataset(Dataset):
 
             if self.selected_features is not None:
                 imgs[feature] = imgs[feature][:, self.selected_features[feature]]
+                
+            imgs[feature] = imgs[feature].to(config['device'])
 
         return imgs, label
     

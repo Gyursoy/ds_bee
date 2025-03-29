@@ -4,6 +4,7 @@ import librosa as lb
 from torchvision import transforms
 import numpy as np
 from torchvision.io import read_image
+import torch
 
 from src.utils import config
 import src.preprocessing as preproc
@@ -119,6 +120,8 @@ def tmp():
 
 
 def main():
+
+    # print(torch.version.cuda)
 
     # convert_to_WAV()
 
