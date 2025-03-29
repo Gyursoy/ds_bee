@@ -7,7 +7,7 @@ from tqdm import tqdm
 import gc
 from pathlib import Path
 from typing import Dict, List, Tuple
-from scipy.signal import welch
+from scipy.signal import welch, resample
 
 __all__ = ['AudioFeatureExtractor']
 
@@ -208,40 +208,51 @@ class AudioFeatureExtractor:
         return lpc_features
     
     def power_spectral_density(self, y: np.ndarray, image_file: str) -> None:
-        # Calculate frame length to match window_length
-        frame_length = len(y) // self.window_length
-        
-        
+        # Calculate frame length to match desired 128 time points 
+        frame_length = len(y) // 128
+
         # Initialize array to store PSD values
-        psd_features = np.zeros((self.n_fft//2 + 1, self.window_length))
+        psd_features = np.zeros((256, 128))
         
         # Process audio in frames
-        for i in range(self.window_length):
+        for i in range(128):
             start = i * frame_length
             end = start + frame_length
             if end <= len(y):
                 frame = y[start:end]
-                # Calculate PSD using Welch method
-                frequencies, psd = welch(frame, fs=self.sr, nperseg=min(256, len(frame)), 
-                                      noverlap=None, nfft=self.n_fft)
-                psd_features[:, i] = psd
+                frequencies, psd = welch(frame, 
+                                      fs=self.sr,
+                                      nperseg=min(256, len(frame)),
+                                      noverlap=min(128, len(frame)//2),
+                                      nfft=512)
+                psd_features[:, i] = psd[:256]
+
+        # Avoid log of zero
+        epsilon = 1e-10
+        psd_features = np.maximum(psd_features, epsilon)
         
-        # Convert to dB scale and normalize
-        psd_features = lb.amplitude_to_db(psd_features, ref=np.max)
-        psd_features = lb.util.normalize(psd_features)
+        # Convert to dB scale with fixed reference
+        psd_features = lb.power_to_db(psd_features, ref=1.0)
+        
+        # Normalize to [0,1] range
+        psd_features = (psd_features - np.min(psd_features)) / (np.max(psd_features) - np.min(psd_features) + epsilon)
 
         # Save as image
-        fig = plt.figure(figsize=(1.28, 0.12), dpi=100)
+        fig = plt.figure(figsize=(1.28, 2.56), dpi=100)
         lb.display.specshow(psd_features, sr=self.sr, hop_length=self.hop_length)
+        
+        # Scale values to 0-255 range for better image representation
+        # psd_features = (255 * psd_features).astype(np.uint8)
+        
+        # Create figure with exact pixel dimensions
+        # Using 128x256 to match your data dimensions
+        # fig = plt.figure(figsize=(1.28, 2.56), dpi=100)  # This will give 128x256 pixels
+        # plt.imshow(psd_features, cmap='gray', aspect='auto')
         plt.axis('off')
         plt.tight_layout(pad=0)
         plt.savefig(image_file, pad_inches=0)
         plt.clf()
         plt.close(fig)
-
-        # Save numerical features in npz format
-        # npz_file = image_file.replace('.jpg', '.npz')
-        # np.savez_compressed(npz_file, psd_features)
         
         return psd_features
 

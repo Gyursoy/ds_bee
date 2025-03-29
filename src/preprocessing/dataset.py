@@ -11,19 +11,19 @@ from sklearn.model_selection import train_test_split
 from ..utils.config import config
 
 
-TRAIN = 'Train'
-VAL = 'Val' 
-TEST = 'Test'
+TRAIN = 'train'
+VAL = 'val'
+TEST = 'test'
 
 
 class AudioDataset(Dataset):
 
     stat_features = ['zcr', 'rms', 'sce', 'lpc']
-    img_features = ['mel', 'mfc', 'stf', 'chr', 'dmf']
+    img_features = ['mel', 'mfc', 'stf', 'chr', 'dmf', 'psd']
 
-    def __init__(self, transform=None, selected_features=None):
+    def __init__(self, df, transform=None, selected_features=None):
         
-        df = pd.read_csv(Path(config['data']['df_model_path']))
+        # df = pd.read_csv(Path(config['data']['df_model_path']))
 
         # if config['model']['prediction_type'] == 'regression':
         #     self.df = self.construct_regression_df(df)
@@ -54,6 +54,7 @@ class AudioDataset(Dataset):
                 feat_name = dir_name + self.df.iloc[idx]['audio'][:-4] + ".npz"
                 imgs[feature] = np.load(self.data_folder / dir_name / feat_name)['arr_0']
                 imgs[feature] = torch.tensor(imgs[feature])
+                imgs[feature] = imgs[feature].unsqueeze(0)
             else:     
                 img_name = dir_name + self.df.iloc[idx]['audio'][:-4] + ".jpg"
                 imgs[feature] = read_image(str(self.data_folder / dir_name / img_name))
@@ -97,7 +98,7 @@ def construct_regression_df(df):
 
 
 
-def split_data(df, seed):
+def split_data(df, seed=42):
     df_train, df_test = train_test_split(df, test_size=0.2, random_state=seed)
     df_train, df_val = train_test_split(df_train, test_size=0.15, random_state=seed)
 

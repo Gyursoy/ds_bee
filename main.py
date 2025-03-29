@@ -1,7 +1,9 @@
 from pathlib import Path
 import pandas as pd
 import librosa as lb
+from torchvision import transforms
 import numpy as np
+from torchvision.io import read_image
 
 from src.utils import config
 import src.preprocessing as preproc
@@ -59,7 +61,7 @@ def run_genetic_algorithm():
     df_model = pd.read_csv(config['data']['df_model_path'])
     dfs = preproc.dataset.get_dataframes(df_model)
 
-    results = genetic.genetic_algorithm(dfs)
+    results = genetic.genetic_algorithm(dfs, config)
     res_path = config['data']['data_folder'] + "\\ga_results"
     if not os.path.exists(res_path):
         os.makedirs(res_path)
@@ -83,15 +85,36 @@ def test_new_features():
 
 def tmp():
 
-    tmp_feat = np.load('Data\spectralCentroid_data\spectralCentroid_data__200726-095704-22.npz')
+    extractor = AudioFeatureExtractor(audio_params = config['audio'])
+    y, _ = lb.load(path='Data\WAV_data\__200716-201359-22.wav', sr=config['audio']['sample_rate'])
+    psd_feat = extractor.power_spectral_density(y, config['data']['data_folder']+'\\'+'test'+'\\'+'test.jpg')
 
-    print(tmp_feat['arr_0'])
+    
+
+    print('Data returned by feature extractor:')
+    print(psd_feat.shape)
+    print(psd_feat)
+    
+
+    # tmp_feat = read_image('Data\psd_data\psd_data__200716-201359-22.jpg')
+
+    # print('\n\n Data fetched by loading image:')
+    # print(tmp_feat.shape)
+    # print(tmp_feat)
+
+    # TRANSFORM = transforms.Compose([
+    #                 transforms.Grayscale(),
+    #                 transforms.ToPILImage(),
+    #                 transforms.RandomVerticalFlip(p=1),
+    #                 transforms.ToTensor(),
+    #             ])
 
     # df = pd.read_csv(config['data']['df_model_path'])
 
-    # dataset = preproc.AudioDataset()
-
-    # print(dataset[1][0]['sce'])
+    # dataset = preproc.AudioDataset(transform=TRANSFORM)
+    # print('\n\n Data fetched from AudioDataset')
+    # print(dataset[0][0]['psd'].shape)
+    # print(dataset[0][0]['psd'])
 
 
 
@@ -101,11 +124,10 @@ def main():
 
     # extract_features()
 
-    test_new_features()
+    # test_new_features()
     # tmp()
 
-    # genetic.genetic_algorithm()
-
+    run_genetic_algorithm()
 
 if __name__ ==  "__main__":
     main()

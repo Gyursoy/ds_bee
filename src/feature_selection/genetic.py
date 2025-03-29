@@ -96,12 +96,12 @@ def fitness(individual, dataframes, config, display_disabled=True):
 
     rng = torch.Generator().manual_seed(config['seed'])
 
-    datasets = {TRAIN : AudioDataset(dataframes[TRAIN], config['data']['data_folder'], transform=TRANSFORM, selected_features=individual),
-                VAL : AudioDataset(dataframes[VAL], config['data']['data_folder'], transform=TRANSFORM, selected_features=individual),
-                TEST : AudioDataset(dataframes[TEST], config['data']['data_folder'], transform=TRANSFORM, selected_features=individual)}
+    datasets = {TRAIN : AudioDataset(dataframes[TRAIN], transform=TRANSFORM, selected_features=individual),
+                VAL : AudioDataset(dataframes[VAL], transform=TRANSFORM, selected_features=individual),
+                TEST : AudioDataset(dataframes[TEST], transform=TRANSFORM, selected_features=individual)}
 
     dataloaders = {TRAIN: DataLoader(datasets[TRAIN], config['model']['train_batch_size'], shuffle=True, generator=rng),
-                  VAL: DataLoader(datasets[VAL], config['model']['validation_batch_size'], shuffle=False, generator=rng),
+                  VAL: DataLoader(datasets[VAL], config['model']['val_batch_size'], shuffle=False, generator=rng),
                   TEST: DataLoader(datasets[TEST], config['model']['test_batch_size'], shuffle=False, generator=rng)
                   }
 
@@ -119,11 +119,11 @@ def fitness(individual, dataframes, config, display_disabled=True):
 
     return fitness_score
 
-def genetic_algorithm(dataframes):
+def genetic_algorithm(dataframes, config):
     population = generate_population()
 
     for generation in tqdm(range(NUM_GENERATIONS), total=NUM_GENERATIONS, position=0, leave=True):
-        fitness_scores = [(individual, fitness(individual, dataframes)) 
+        fitness_scores = [(individual, fitness(individual, dataframes, config=config)) 
                          for individual in tqdm(population, total=len(population), position=1)]
         fitness_scores.sort(key=lambda x: x[1], reverse=True)
 

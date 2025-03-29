@@ -14,6 +14,7 @@ data:
     rms : "rms_data"
     lpc : "lpc_data"
     sce : "spectralCentroid_data"
+    psd : "psd_data"
 
   files_to_unarchive : ["Data/2020.07.26.zip", "Data/2020.06.20.zip"]
   hives_to_include : [22, 30, 31, 34, 35, 36, 37]
