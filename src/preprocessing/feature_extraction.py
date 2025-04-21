@@ -7,7 +7,7 @@ from tqdm import tqdm
 import gc
 from pathlib import Path
 from typing import Dict, List, Tuple
-from scipy.signal import welch, resample
+from scipy.signal import welch
 
 __all__ = ['AudioFeatureExtractor']
 
@@ -43,12 +43,12 @@ class AudioFeatureExtractor:
 
     def create_stft(self, y: np.ndarray, image_file: str) -> None:
 
-        audio_stft = lb.core.stft(y=y, hop_length=self.hop_length, n_fft=self.n_fft)
+        audio_stft = lb.core.stft(y=y, hop_length=self.hop_length, n_fft=((self.n_fft//2)-1))
         spectrogram = np.abs(audio_stft)
         log_spectro = lb.amplitude_to_db(spectrogram)
         log_spectro = log_spectro[:, 0:self.window_length]
 
-        fig = plt.figure(figsize=(1.28, 10.25), dpi=100)
+        fig = plt.figure(figsize=(1.28, 5.12), dpi=100)
         librosa.display.specshow(log_spectro, sr=self.sr, hop_length=self.hop_length)
         plt.axis('off')
         plt.tight_layout(pad=0)
@@ -114,7 +114,7 @@ class AudioFeatureExtractor:
         # Ensure we get exactly window_length frames
         zcr = lb.util.fix_length(zcr, size=self.window_length, axis=1)
         
-        #Save as image
+        # Save as image
         # fig = plt.figure(figsize=(1.28, 0.12), dpi=100)
         # lb.display.specshow(zcr, sr=self.sr, hop_length=self.hop_length)
         # plt.axis('off')
@@ -143,8 +143,7 @@ class AudioFeatureExtractor:
         
         # Ensure we get exactly window_length frames
         centroid = lb.util.fix_length(centroid, size=self.window_length, axis=1)
-        
-        # Scale the centroid values to a reasonable range while preserving relationships
+        #scaling
         centroid = (centroid - np.min(centroid)) / (np.max(centroid) - np.min(centroid) + 1e-6)
         
         # Save numerical features in npz format
@@ -181,7 +180,6 @@ class AudioFeatureExtractor:
     
 
     def lpc_features(self, y: np.ndarray, image_file: str) -> None:
-        # Calculate frame length to match window_length
         frame_length = len(y) // self.window_length
         
         # Initialize array to store LPC coefficients
@@ -208,51 +206,46 @@ class AudioFeatureExtractor:
         return lpc_features
     
     def power_spectral_density(self, y: np.ndarray, image_file: str) -> None:
-        # Calculate frame length to match desired 128 time points 
-        frame_length = len(y) // 128
-
-        # Initialize array to store PSD values
-        psd_features = np.zeros((256, 128))
+        # Calculate frame length to match window_length
+        frame_length = len(y) // self.window_length
+        
+        # Initialize array to store PSD values (now 128 features)
+        psd_features = np.zeros((128, self.window_length))
         
         # Process audio in frames
-        for i in range(128):
+        for i in range(self.window_length):
             start = i * frame_length
             end = start + frame_length
             if end <= len(y):
                 frame = y[start:end]
-                frequencies, psd = welch(frame, 
-                                      fs=self.sr,
-                                      nperseg=min(256, len(frame)),
-                                      noverlap=min(128, len(frame)//2),
-                                      nfft=512)
-                psd_features[:, i] = psd[:256]
-
-        # Avoid log of zero
-        epsilon = 1e-10
-        psd_features = np.maximum(psd_features, epsilon)
+                # Calculate PSD using Welch method with adjusted parameters
+                frequencies, psd = welch(frame, fs=self.sr, nperseg=256, 
+                                      noverlap=128, nfft=256, detrend=False)
+                # Ensure we have non-zero values and remove DC
+                psd = np.maximum(psd[1:], 1e-10)  # Avoid log(0)
+                psd_features[:, i] = psd
         
-        # Convert to dB scale with fixed reference
-        psd_features = lb.power_to_db(psd_features, ref=1.0)
+        # Convert to dB scale (after ensuring no zeros)
+        psd_features = lb.power_to_db(psd_features)
         
-        # Normalize to [0,1] range
-        psd_features = (psd_features - np.min(psd_features)) / (np.max(psd_features) - np.min(psd_features) + epsilon)
+        # Normalize between 0 and 1
+        psd_min = np.min(psd_features)
+        psd_max = np.max(psd_features)
+        if psd_max > psd_min:        
+            psd_features = (psd_features - psd_min) / (psd_max - psd_min)
 
         # Save as image
-        fig = plt.figure(figsize=(1.28, 2.56), dpi=100)
+        fig = plt.figure(figsize=(1.28, 1.28), dpi=100)
         lb.display.specshow(psd_features, sr=self.sr, hop_length=self.hop_length)
-        
-        # Scale values to 0-255 range for better image representation
-        # psd_features = (255 * psd_features).astype(np.uint8)
-        
-        # Create figure with exact pixel dimensions
-        # Using 128x256 to match your data dimensions
-        # fig = plt.figure(figsize=(1.28, 2.56), dpi=100)  # This will give 128x256 pixels
-        # plt.imshow(psd_features, cmap='gray', aspect='auto')
         plt.axis('off')
         plt.tight_layout(pad=0)
         plt.savefig(image_file, pad_inches=0)
         plt.clf()
         plt.close(fig)
+
+        # Save numerical features in npz format
+        # npz_file = image_file.replace('.jpg', '.npz')
+        # np.savez_compressed(npz_file, psd_features)
         
         return psd_features
 
@@ -286,7 +279,7 @@ class AudioFeatureExtractor:
                 feature_types = {}
                 for key in dir_dict.keys():
                     os.makedirs(os.path.abspath(os.path.join(output_path, dir_dict[key])), exist_ok=True)
-                    feature_types[key] = (self.map_dir_to_features(key), dir_dict[key])
+                    feature_types[key] = (self.map_dir_to_features(key), key)
 
                 for key, (func, prefix) in feature_types.items():
                     # output_file = output_path / dir_dict[key] / f"{prefix}{file.replace('.wav', '.jpg')}"

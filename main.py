@@ -5,6 +5,9 @@ from torchvision import transforms
 import numpy as np
 from torchvision.io import read_image
 import torch
+from torch.utils.data import DataLoader
+from torch.optim import Adam, AdamW
+import torch.nn as nn
 
 from src.utils import config
 import src.preprocessing as preproc
@@ -19,6 +22,17 @@ import src
 from src.preprocessing import AudioFeatureExtractor
 
 import os
+
+TRAIN = 'train'
+VAL = 'val'
+TEST = 'test'
+
+TRANSFORM = transforms.Compose([
+    transforms.Grayscale(),
+    transforms.ToPILImage(),
+    transforms.RandomVerticalFlip(p=1),
+    transforms.ToTensor(),
+])
 
 # Unarchive and convert PCM files to WAV
 def convert_to_WAV():
@@ -117,7 +131,47 @@ def tmp():
     # print(dataset[0][0]['psd'].shape)
     # print(dataset[0][0]['psd'])
 
+def test_train():
+    df = pd.read_csv(config['data']['df_model_path'])
+    dataframes = preproc.dataset.get_dataframes(df)
 
+    individual = genetic.generate_individual()
+
+    # model = models.BaseCNNModel(config['model'])
+    # model = models.BaseCNNModel().to(config['device'])
+    model = models.TCNModel(num_channels=[32, 64, 128]).to(config['device'])
+
+    datasets = {TRAIN : preproc.AudioDataset(dataframes[TRAIN], transform=TRANSFORM, selected_features=individual),
+                VAL : preproc.AudioDataset(dataframes[VAL], transform=TRANSFORM, selected_features=individual),
+                TEST : preproc.AudioDataset(dataframes[TEST], transform=TRANSFORM, selected_features=individual)}
+
+    dataloaders = {TRAIN: DataLoader(datasets[TRAIN], config['model']['train_batch_size'], shuffle=True),
+                  VAL: DataLoader(datasets[VAL], config['model']['val_batch_size'], shuffle=False),
+                  TEST: DataLoader(datasets[TEST], config['model']['test_batch_size'], shuffle=False)
+                  }
+
+    criterion = nn.MSELoss()
+    # optimizer = Adam(model.parameters(), lr=0.001, weight_decay=0.0002)
+    optimizer = AdamW(model.parameters(), lr=config['model']['learning_rate'], weight_decay=config['model']['weight_decay'])
+
+    scheduler = train.get_scheduler(
+    optimizer,
+    scheduler_type='one_cycle',
+    max_lr=0.001,  # adjust based on your needs
+    steps_per_epoch=len(dataloaders[TRAIN])
+    )
+
+    train.train_model(model, criterion, optimizer, dataloaders, scheduler=scheduler)
+
+def tmp2():
+    df = pd.read_csv(config['data']['df_model_path'])
+
+    dataset = preproc.AudioDataset(df, transform=TRANSFORM)
+
+    print(dataset[1][0]['stf'].shape)
+    for key, value in dataset[1][0].items():
+        print(key, value.shape)
+    # print(dataset[1][0]['psd'])
 
 def main():
 
@@ -131,6 +185,11 @@ def main():
     # tmp()
 
     run_genetic_algorithm()
+
+    # test_train()
+    
+    # tmp2()
+
 
 if __name__ ==  "__main__":
     main()

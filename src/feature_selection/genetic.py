@@ -34,6 +34,9 @@ TRAIN = 'train'
 VAL = 'val'
 TEST = 'test'
 
+ELITE_SIZE = int(POPULATION_SIZE * 0.1)  # Keep top 10% of individuals
+TOURNAMENT_SIZE = 5  # Number of individuals in each tournament
+
 def generate_individual():
     individual = defaultdict(list)
     selected_features = 0
@@ -50,17 +53,46 @@ def generate_individual():
 def generate_population():
     return [generate_individual() for _ in range(POPULATION_SIZE)]
 
+# def mutate(individual):
+#     for i in range(TARGET_FEATURE_COUNT):
+#         if random.random() < MUTATION_RATE:
+#             feature_type = random.choices(list(feature_counts.keys()), 
+#                                        weights=feature_weights.values())[0]
+#             index = random.randint(0, len(individual[feature_type]) - 1)
+#             feature_index = random.randint(0, feature_counts[feature_type] - 1)
+
+#             while feature_index not in individual[feature_type]:
+#                 individual[feature_type][index] = feature_index
+#                 feature_index = random.randint(0, feature_counts[feature_type] - 1)
+                
+#     return individual
+
 def mutate(individual):
     for i in range(TARGET_FEATURE_COUNT):
         if random.random() < MUTATION_RATE:
-            feature_type = random.choices(list(feature_counts.keys()), 
-                                       weights=feature_weights.values())[0]
+            # Get feature types that have room for mutation (more features available than used)
+            mutable_types = [ft for ft in feature_counts.keys() 
+                           if len(individual[ft]) > 0 and  # Has features selected
+                           feature_counts[ft] > 1]  # Has more than 1 possible feature
+            
+            if not mutable_types:
+                continue
+                
+            # Select random feature type from mutable ones
+            feature_weights_subset = {k: feature_weights[k] for k in mutable_types}
+            weights = [feature_weights_subset[k] for k in mutable_types]
+            feature_type = random.choices(mutable_types, weights=weights)[0]
+            
+            # Select random index to mutate
             index = random.randint(0, len(individual[feature_type]) - 1)
-            feature_index = random.randint(0, feature_counts[feature_type] - 1)
-
-            while feature_index not in individual[feature_type]:
-                individual[feature_type][index] = feature_index
-                feature_index = random.randint(0, feature_counts[feature_type] - 1)
+            current_feature = individual[feature_type][index]
+            
+            # Get all possible features except the current one
+            available_features = [f for f in range(feature_counts[feature_type]) 
+                                if f != current_feature and f not in individual[feature_type]]
+            
+            if available_features:  # Only mutate if we have alternative features
+                individual[feature_type][index] = random.choice(available_features)
                 
     return individual
 
@@ -79,15 +111,44 @@ def crossover(parent1, parent2):
         for feature in parent2.keys():
             combined_features.extend([(feature, f) for f in parent2[feature]])
 
-        combined_features = list(set(combined_features))
-        selected_features1 = random.choices(combined_features, k=TARGET_FEATURE_COUNT)
-        selected_features2 = random.choices(combined_features, k=TARGET_FEATURE_COUNT)
+        # combined_features = list(set(combined_features))
+        # selected_features1 = random.choices(combined_features, k=TARGET_FEATURE_COUNT)
+        # selected_features2 = random.choices(combined_features, k=TARGET_FEATURE_COUNT)
+        
+        ### New code 
+        # Remove duplicates while maintaining order
+        combined_features = list(dict.fromkeys(combined_features))
+        
+        # Randomly select features ensuring no duplicates per feature type
+        for i in range(TARGET_FEATURE_COUNT):
+            # Filter available features that haven't been used in child1
+            available1 = [(ft, f) for ft, f in combined_features 
+                         if f not in child1[ft]]
+            if available1:
+                ft, f = random.choice(available1)
+                child1[ft].append(f)
+            
+            # Same for child2
+            available2 = [(ft, f) for ft, f in combined_features 
+                         if f not in child2[ft]]
+            if available2:
+                ft, f = random.choice(available2)
+                child2[ft].append(f)
+        ### New code end
+        
+        # for feature, index in selected_features1:
+        #    child1[feature].append(index)
 
-        for feature, index in selected_features1:
-           child1[feature].append(index)
+        # for feature, index in selected_features2:
+        #    child2[feature].append(index)
 
-        for feature, index in selected_features2:
-           child2[feature].append(index)
+        ### New code end
+        
+        # for feature, index in selected_features1:
+        #    child1[feature].append(index)
+
+        # for feature, index in selected_features2:
+        #    child2[feature].append(index)
 
     return [child1, child2]
 
@@ -119,6 +180,13 @@ def fitness(individual, dataframes, config, display_disabled=True):
 
     return fitness_score
 
+def tournament_select(population, fitness_scores):
+    """Select one parent using tournament selection"""
+    tournament_indices = random.sample(range(len(population)), TOURNAMENT_SIZE)
+    tournament_fitness = [(i, fitness_scores[i]) for i in tournament_indices]
+    winner_idx = max(tournament_fitness, key=lambda x: x[1])[0]
+    return population[winner_idx]
+
 def genetic_algorithm(dataframes, config):
     population = generate_population()
 
@@ -132,17 +200,17 @@ def genetic_algorithm(dataframes, config):
 
         print(f'Top 5 fitness scores generation {generation}: \n', fitness_scores_df[:5])
 
-        selected_parents = random.choices(population, 
-                                       weights=fitness_scores_df['fitness_score'], 
-                                       k=POPULATION_SIZE)
+        # Elitism - keep best individuals
+        new_population = [ind for ind, _ in fitness_scores[:ELITE_SIZE]]
 
-        new_population = []
-        for i in range(0, POPULATION_SIZE, 2):
-            parent1, parent2 = selected_parents[i], selected_parents[i + 1]
+        # Tournament selection for remaining spots
+        while len(new_population) < POPULATION_SIZE:
+            parent1 = tournament_select(population, fitness_scores_df['fitness_score'])
+            parent2 = tournament_select(population, fitness_scores_df['fitness_score'])
             child1, child2 = crossover(parent1, parent2)
-            new_population.append(mutate(child1))
-            new_population.append(mutate(child2))
+            new_population.extend([mutate(child1), mutate(child2)])
 
-        population = new_population
+        # Trim to exact population size if needed
+        population = new_population[:POPULATION_SIZE]
 
     return fitness_scores_df

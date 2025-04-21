@@ -51,13 +51,13 @@ class AudioDataset(Dataset):
         imgs = {}
         for feature, dir_name in self.dir_dict.items():
             if feature in self.stat_features:
-                feat_name = dir_name + self.df.iloc[idx]['audio'][:-4] + ".npz"
+                feat_name = feature + self.df.iloc[idx]['audio'][:-4] + ".npz"
                 imgs[feature] = np.load(self.data_folder / dir_name / feat_name)['arr_0']
                 imgs[feature] = torch.tensor(imgs[feature])
                 imgs[feature] = imgs[feature].unsqueeze(0)
                 imgs[feature] = imgs[feature].float()
             else:     
-                img_name = dir_name + self.df.iloc[idx]['audio'][:-4] + ".jpg"
+                img_name = feature + self.df.iloc[idx]['audio'][:-4] + ".jpg"
                 imgs[feature] = read_image(str(self.data_folder / dir_name / img_name))
             
                 if self.transform:
