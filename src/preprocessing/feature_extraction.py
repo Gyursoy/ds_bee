@@ -111,7 +111,7 @@ class AudioFeatureExtractor:
         frame_length = len(y) // self.window_length
         zcr = lb.feature.zero_crossing_rate(y=y, frame_length=frame_length, 
                                           hop_length=frame_length)
-        # Ensure we get exactly window_length frames
+        
         zcr = lb.util.fix_length(zcr, size=self.window_length, axis=1)
         
         # Save as image
@@ -130,10 +130,8 @@ class AudioFeatureExtractor:
         return zcr
 
     def spectral_centroid(self, y: np.ndarray, image_file: str) -> None:
-        # Calculate frame length to match window_length
         frame_length = len(y) // self.window_length
         
-        # Calculate spectral centroid
         centroid = lb.feature.spectral_centroid(
             y=y, 
             sr=self.sr,
@@ -141,7 +139,6 @@ class AudioFeatureExtractor:
             hop_length=frame_length
         )
         
-        # Ensure we get exactly window_length frames
         centroid = lb.util.fix_length(centroid, size=self.window_length, axis=1)
         #scaling
         centroid = (centroid - np.min(centroid)) / (np.max(centroid) - np.min(centroid) + 1e-6)
@@ -157,7 +154,7 @@ class AudioFeatureExtractor:
         frame_length = len(y) // self.window_length
         rms = lb.feature.rms(y=y, frame_length=frame_length, 
                            hop_length=frame_length)
-        # Ensure we get exactly window_length frames
+        
         rms = lb.util.fix_length(rms, size=self.window_length, axis=1)
         
         # Convert to dB scale
@@ -182,21 +179,17 @@ class AudioFeatureExtractor:
     def lpc_features(self, y: np.ndarray, image_file: str) -> None:
         frame_length = len(y) // self.window_length
         
-        # Initialize array to store LPC coefficients
         lpc_features = np.zeros((16, self.window_length))
         
-        # Process audio in frames
         for i in range(self.window_length):
             start = i * frame_length
             end = start + frame_length
             if end <= len(y):
                 frame = y[start:end]
-                # Calculate LPC coefficients (order=8)
+                # Calculate LPC coefficients
                 lpc_coeffs = lb.lpc(frame, order=16)
-                # Store coefficients (excluding first coefficient)
                 lpc_features[:, i] = lpc_coeffs[1:]
         
-        # Normalize features
         lpc_features = lb.util.normalize(lpc_features)
         
         # Save numerical features in npz format
@@ -206,7 +199,6 @@ class AudioFeatureExtractor:
         return lpc_features
     
     def power_spectral_density(self, y: np.ndarray, image_file: str) -> None:
-        # Calculate frame length to match window_length
         frame_length = len(y) // self.window_length
         
         # Initialize array to store PSD values (now 128 features)
@@ -222,7 +214,7 @@ class AudioFeatureExtractor:
                 frequencies, psd = welch(frame, fs=self.sr, nperseg=256, 
                                       noverlap=128, nfft=256, detrend=False)
                 # Ensure we have non-zero values and remove DC
-                psd = np.maximum(psd[1:], 1e-10)  # Avoid log(0)
+                psd = np.maximum(psd[1:], 1e-10)
                 psd_features[:, i] = psd
         
         # Convert to dB scale (after ensuring no zeros)
@@ -282,7 +274,6 @@ class AudioFeatureExtractor:
                     feature_types[key] = (self.map_dir_to_features(key), key)
 
                 for key, (func, prefix) in feature_types.items():
-                    # output_file = output_path / dir_dict[key] / f"{prefix}{file.replace('.wav', '.jpg')}"
                     output_file = os.path.abspath(os.path.join(output_path, dir_dict[key], f"{prefix}{file.replace('.wav', '.jpg')}"))
                     func(y, output_file)
 

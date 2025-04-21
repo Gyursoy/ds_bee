@@ -64,7 +64,7 @@ class BaseCNNModel(nn.Module):
 class TemporalBlock(nn.Module):
     def __init__(self, n_inputs, n_outputs, kernel_size, stride, dilation, padding, dropout=0.2):
         super(TemporalBlock, self).__init__()
-        # Calculate padding to maintain same size
+        
         effective_kernel_size = (kernel_size - 1) * dilation
         same_padding = effective_kernel_size // 2
         

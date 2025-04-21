@@ -53,19 +53,7 @@ def generate_individual():
 def generate_population():
     return [generate_individual() for _ in range(POPULATION_SIZE)]
 
-# def mutate(individual):
-#     for i in range(TARGET_FEATURE_COUNT):
-#         if random.random() < MUTATION_RATE:
-#             feature_type = random.choices(list(feature_counts.keys()), 
-#                                        weights=feature_weights.values())[0]
-#             index = random.randint(0, len(individual[feature_type]) - 1)
-#             feature_index = random.randint(0, feature_counts[feature_type] - 1)
 
-#             while feature_index not in individual[feature_type]:
-#                 individual[feature_type][index] = feature_index
-#                 feature_index = random.randint(0, feature_counts[feature_type] - 1)
-                
-#     return individual
 
 def mutate(individual):
     for i in range(TARGET_FEATURE_COUNT):
@@ -91,7 +79,7 @@ def mutate(individual):
             available_features = [f for f in range(feature_counts[feature_type]) 
                                 if f != current_feature and f not in individual[feature_type]]
             
-            if available_features:  # Only mutate if we have alternative features
+            if available_features:
                 individual[feature_type][index] = random.choice(available_features)
                 
     return individual
@@ -111,17 +99,12 @@ def crossover(parent1, parent2):
         for feature in parent2.keys():
             combined_features.extend([(feature, f) for f in parent2[feature]])
 
-        # combined_features = list(set(combined_features))
-        # selected_features1 = random.choices(combined_features, k=TARGET_FEATURE_COUNT)
-        # selected_features2 = random.choices(combined_features, k=TARGET_FEATURE_COUNT)
-        
-        ### New code 
-        # Remove duplicates while maintaining order
+        # Remove duplicates
         combined_features = list(dict.fromkeys(combined_features))
         
-        # Randomly select features ensuring no duplicates per feature type
+        # Randomly select features ensuring no duplicates
         for i in range(TARGET_FEATURE_COUNT):
-            # Filter available features that haven't been used in child1
+
             available1 = [(ft, f) for ft, f in combined_features 
                          if f not in child1[ft]]
             if available1:
@@ -134,21 +117,7 @@ def crossover(parent1, parent2):
             if available2:
                 ft, f = random.choice(available2)
                 child2[ft].append(f)
-        ### New code end
-        
-        # for feature, index in selected_features1:
-        #    child1[feature].append(index)
 
-        # for feature, index in selected_features2:
-        #    child2[feature].append(index)
-
-        ### New code end
-        
-        # for feature, index in selected_features1:
-        #    child1[feature].append(index)
-
-        # for feature, index in selected_features2:
-        #    child2[feature].append(index)
 
     return [child1, child2]
 
@@ -166,7 +135,7 @@ def fitness(individual, dataframes, config, display_disabled=True):
                   TEST: DataLoader(datasets[TEST], config['model']['test_batch_size'], shuffle=False, generator=rng)
                   }
 
-    # Train and evaluate the model (example function)
+    # Train and evaluate the model
     model = BaseCNNModel().to(config['device'])
 
     criterion = nn.MSELoss()

@@ -90,7 +90,7 @@ def train_model(model, criterion, optimizer, dataloaders, num_epochs=None, displ
                         optimizer.zero_grad()
                         total_loss.backward()
                         optimizer.step()
-                        # Update OneCycleLR per iteration
+
                         if isinstance(scheduler, OneCycleLR):
                             scheduler.step()
 
@@ -101,7 +101,6 @@ def train_model(model, criterion, optimizer, dataloaders, num_epochs=None, displ
 
             avg_loss = loss_epoch / dataset_sizes[stage]
 
-            # Update ReduceLROnPlateau after validation epoch
             if stage == VAL and isinstance(scheduler, ReduceLROnPlateau):
                 scheduler.step(avg_loss)
 
