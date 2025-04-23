@@ -4,11 +4,14 @@ import torch
 from tqdm.auto import tqdm
 import pandas as pd
 from torch.utils.data import DataLoader
-from torch.optim import Adam
+from torch.optim import Adam, AdamW
 import torch.nn as nn
 from torchvision import transforms
+import logging
+from datetime import datetime
+import os
 
-from ..training.train import train_model
+from ..training.train import train_model, get_scheduler
 from ..preprocessing.dataset import AudioDataset
 from ..models import BaseCNNModel
 from ..utils.config import config
@@ -34,8 +37,19 @@ TRAIN = 'train'
 VAL = 'val'
 TEST = 'test'
 
-ELITE_SIZE = int(POPULATION_SIZE * 0.1)  # Keep top 10% of individuals
+ELITE_SIZE = int(POPULATION_SIZE * 0.05)  # Keep top 10% of individuals
 TOURNAMENT_SIZE = 5  # Number of individuals in each tournament
+
+log_dir = 'Data/ga_logs'
+os.makedirs(log_dir, exist_ok=True)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(f'{log_dir}/ga_run_{datetime.now().strftime("%Y%m%d_%H%M")}.log'),
+        logging.StreamHandler()
+    ]
+)
 
 def generate_individual():
     individual = defaultdict(list)
@@ -52,8 +66,6 @@ def generate_individual():
 
 def generate_population():
     return [generate_individual() for _ in range(POPULATION_SIZE)]
-
-
 
 def mutate(individual):
     for i in range(TARGET_FEATURE_COUNT):
@@ -121,7 +133,6 @@ def crossover(parent1, parent2):
 
     return [child1, child2]
 
-
 def fitness(individual, dataframes, config, display_disabled=True):
 
     rng = torch.Generator().manual_seed(config['seed'])
@@ -140,12 +151,21 @@ def fitness(individual, dataframes, config, display_disabled=True):
 
     criterion = nn.MSELoss()
 
-    optimizer = Adam(model.parameters(), lr=config['model']['learning_rate'], weight_decay=0.0002)
+    # optimizer = Adam(model.parameters(), lr=config['model']['learning_rate'], weight_decay=0.0002)
+    optimizer = AdamW(model.parameters(), lr=config['model']['learning_rate'], weight_decay=config['model']['weight_decay'])
+    
+    scheduler = get_scheduler(
+    optimizer,
+    scheduler_type='one_cycle',
+    max_lr=0.001,  # adjust based on your needs
+    steps_per_epoch=len(dataloaders[TRAIN])
+    )
 
-    model, score = train_model(model, criterion, optimizer, dataloaders, num_epochs = 10, display_disabled=display_disabled)
+    epochs = config['model']['num_epochs']
+
+    model, score = train_model(model, criterion, optimizer, dataloaders, num_epochs=epochs, display_disabled=display_disabled, scheduler=scheduler)
 
     fitness_score = 1 / (1 + score)
-
 
     return fitness_score
 
@@ -156,16 +176,60 @@ def tournament_select(population, fitness_scores):
     winner_idx = max(tournament_fitness, key=lambda x: x[1])[0]
     return population[winner_idx]
 
-def genetic_algorithm(dataframes, config):
-    population = generate_population()
+def string_to_features_dict(features_str):
+    # Remove defaultdict wrapper and convert string to dict
+    features_str = features_str.replace('defaultdict(<class \'list\'>, ', '').rstrip(')')
+    # Convert string to dictionary
+    features_dict = eval(features_str)
+    # Convert all feature indices to int
+    return {k: [int(i) for i in v] for k, v in features_dict.items()}
+
+def genetic_algorithm(dataframes, config, continue_from=None):
+    global NUM_GENERATIONS
+    
+    if isinstance(continue_from, str): 
+        if not os.path.exists(continue_from):
+            raise FileNotFoundError(f"File {continue_from} does not exist")
+        logging.info(f"Continuing from generation {continue_from}")
+        population = pd.read_csv(continue_from)['features'].apply(string_to_features_dict).tolist()
+        best_fitness = pd.read_csv(continue_from)['fitness_score'].max()
+        start_gen = int(continue_from.split('_')[-1].split('.')[0][-1:])
+        NUM_GENERATIONS = NUM_GENERATIONS - start_gen
+    else:
+        logging.info(f"Starting GA with population size: {POPULATION_SIZE}, generations: {NUM_GENERATIONS}")
+        logging.info(f"Elite size: {ELITE_SIZE}, Tournament size: {TOURNAMENT_SIZE}")
+        population = generate_population()
+        best_fitness = float('-inf')
+    
+    generations_without_improvement = 0
+
+
 
     for generation in tqdm(range(NUM_GENERATIONS), total=NUM_GENERATIONS, position=0, leave=True):
+        logging.info(f"\nGeneration {generation} started")
+        
         fitness_scores = [(individual, fitness(individual, dataframes, config=config)) 
                          for individual in tqdm(population, total=len(population), position=1)]
         fitness_scores.sort(key=lambda x: x[1], reverse=True)
 
+        # Log generation statistics
+        current_best_fitness = fitness_scores[0][1]
+        avg_fitness = sum(score for _, score in fitness_scores) / len(fitness_scores)
+        logging.info(f"Generation {generation} stats:")
+        logging.info(f"Best fitness: {current_best_fitness:.6f}")
+        logging.info(f"Average fitness: {avg_fitness:.6f}")
+
+        # Track improvement
+        if current_best_fitness > best_fitness:
+            best_fitness = current_best_fitness
+            generations_without_improvement = 0
+            logging.info(f"New best fitness found: {best_fitness:.6f}")
+        else:
+            generations_without_improvement += 1
+            logging.info(f"Generations without improvement: {generations_without_improvement}")
+
         fitness_scores_df = pd.DataFrame(fitness_scores, columns=['features', 'fitness_score'])
-        fitness_scores_df.to_csv(f'Data/fitness_scores_gen{generation}.csv', index=False)
+        fitness_scores_df.to_csv(f'Data/ga_results/exp1/fitness_scores_gen{generation}.csv', index=False)
 
         print(f'Top 5 fitness scores generation {generation}: \n', fitness_scores_df[:5])
 
@@ -179,7 +243,12 @@ def genetic_algorithm(dataframes, config):
             child1, child2 = crossover(parent1, parent2)
             new_population.extend([mutate(child1), mutate(child2)])
 
-        # Trim to exact population size if needed
         population = new_population[:POPULATION_SIZE]
 
+        if generations_without_improvement >= 8:
+            logging.info("Stopping early due to no improvement")
+            break
+
+    logging.info("Genetic Algorithm completed")
+    logging.info(f"Best fitness achieved: {best_fitness:.6f}")
     return fitness_scores_df

@@ -261,6 +261,9 @@ class AudioFeatureExtractor:
 
                     
                 y, _ = lb.load(str(input_file), sr=self.sr)  # librosa needs string path
+
+                y_normalized = y / np.max(np.abs(y))
+
                 
                 if len(y) < self.duration * self.sr - 1 or len(y) > self.duration * self.sr * 10:
                     del y
@@ -275,7 +278,7 @@ class AudioFeatureExtractor:
 
                 for key, (func, prefix) in feature_types.items():
                     output_file = os.path.abspath(os.path.join(output_path, dir_dict[key], f"{prefix}{file.replace('.wav', '.jpg')}"))
-                    func(y, output_file)
+                    func(y_normalized, output_file)
 
                 # print(output_file)
                 # break
